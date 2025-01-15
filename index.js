@@ -36,6 +36,13 @@ async function run() {
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
 
+    const earnMoneyUsersCollection = client.db("earn_db").collection("earnMoneyUser");
+
+    app.post("/earning-users", async (req, res) => {
+      const service = req.body;
+      const result = await earnMoneyUsersCollection.insertOne(service);
+      res.send(result);
+    });
 
 
     // Send a ping to confirm a successful connection

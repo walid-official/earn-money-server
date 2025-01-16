@@ -1,7 +1,7 @@
 require("dotenv").config();
 const express = require('express');
 const cors = require("cors");
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const app = express()
 const port = process.env.PORT || 9000;
 
@@ -37,13 +37,81 @@ async function run() {
     await client.connect();
 
     const earnMoneyUsersCollection = client.db("earn_db").collection("earnMoneyUser");
+     const newTaskCollection = client.db("earn_db").collection("newTasks");
+   
 
     app.post("/earning-users", async (req, res) => {
-      const service = req.body;
-      const result = await earnMoneyUsersCollection.insertOne(service);
+      const user = req.body;
+      const query = {email: user.email};
+      const isExist = await earnMoneyUsersCollection.findOne(query);
+      console.log(isExist);
+      if(isExist){
+        return res.send({message: "User Already Exist"})
+      }
+      const result = await earnMoneyUsersCollection.insertOne(user);
       res.send(result);
     });
 
+    app.get("/users/role/:email", async(req,res) => {
+      const email = req.params.email
+      console.log(email);
+      const query = {email: email}
+      const result = await earnMoneyUsersCollection.findOne(query)
+      console.log(result);
+      res.send({ role: result?.role })
+    })
+
+
+    app.post("/new-tasks", async (req, res) => {
+      const newTasks = req.body;
+      const result = await newTaskCollection.insertOne(newTasks);
+      res.send(result);
+    });
+
+    app.get("/my-tasks/:email", async (req, res) => {
+      const email = req.params.email;
+      console.log(email);
+    
+      try {
+        // Fetch tasks and sort by compilationDate in descending order (-1)
+        const result = await newTaskCollection
+          .find() // Assuming you want to filter by email as well
+          .sort({ compilationDate: -1 })
+          .toArray();
+        
+        res.send(result);
+      } catch (error) {
+        console.error('Error fetching tasks:', error);
+        res.status(500).send('Internal Server Error');
+      }
+    });
+    
+    app.delete("/tasks/:id",async(req,res) => {
+      const id = req.params.id;
+      const query = {_id: new ObjectId(id)};
+      const result = await newTaskCollection.deleteOne(query);
+      res.send(result);
+    })
+
+    app.get("/tasks/:id",async(req,res) => {
+      const id = req.params.id;
+      const query = {_id: new ObjectId(id)};
+      const result = await newTaskCollection.findOne(query);
+      res.send(result);
+    })
+
+    app.patch("/taskUpdate/:id",async(req,res) => {
+      const id = req.params.id;
+      const filter = {_id: new ObjectId(id)};
+      const task = req.body;
+      const updateDoc = {
+        $set: {
+         ...task
+        }
+      }
+      const result = await newTaskCollection.updateOne(filter, updateDoc)
+      res.send(result)
+    })
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });

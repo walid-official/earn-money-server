@@ -1,5 +1,6 @@
 require("dotenv").config();
 const express = require('express');
+var jwt = require("jsonwebtoken");
 const cors = require("cors");
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const app = express()
@@ -39,6 +40,14 @@ async function run() {
     const earnMoneyUsersCollection = client.db("earn_db").collection("earnMoneyUser");
      const newTaskCollection = client.db("earn_db").collection("newTasks");
    
+    // jwt related api
+    app.post("/jwt",async(req,res) => {
+      const user = req.body;
+      const token = jwt.sign(user,process.env.ACCESS_KEY_SECRET,{expiresIn: "1h"})
+      console.log(token);
+      res.send({token})
+    })
+
 
     app.post("/earning-users", async (req, res) => {
       const user = req.body;

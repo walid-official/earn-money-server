@@ -26,7 +26,7 @@ const verifyToken = (req, res, next) => {
   console.log(token);
   jwt.verify(token, process.env.ACCESS_KEY_SECRET, (err, decoded) => {
     if (err) {
-      return res.status(401).send({ message: "Forbidden access" });
+      return res.status(401).send({ message: "Unauthorized access" });
     }
     req.user = decoded;
     next();
@@ -79,7 +79,7 @@ async function run() {
     app.get("/users/role/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
       if (email !== req.user.email) {
-        return res.status(403).send({ message: "Unauthorized access" });
+        return res.status(403).send({ message: "Forbidden access" });
       }
       console.log(email);
       const query = { email: email };

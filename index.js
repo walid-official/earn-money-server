@@ -155,6 +155,19 @@ async function run() {
       res.send(result);
     });
 
+    app.patch("/submissionStatus/:id",async(req,res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const submitStatus = req.body;
+      const updatedDoc = {
+        $set: {
+          status: submitStatus.status,
+        },
+      };
+      const result = await bookServiceCollection.updateOne(filter, updatedDoc);
+      res.send(result);
+    })
+
     
     // Worker API Routes
     app.get("/postedTasks", verifyToken, async (req, res) => {
@@ -175,6 +188,7 @@ async function run() {
       res.send(result);
     })
 
+
     app.get("/mySubmissions/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
       console.log(email);
@@ -182,6 +196,13 @@ async function run() {
       const result = await taskSubmissionCollection.find(query).toArray();
       res.send(result);
     });
+
+
+    app.get("/review-tasks", verifyToken, async(req,res) => {
+      const result = await taskSubmissionCollection.find().toArray();
+      res.send(result);
+    })
+
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });

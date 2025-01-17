@@ -78,6 +78,7 @@ async function run() {
       res.send(result);
     });
 
+    // just For Admin
     app.get("/allUsers/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
       console.log(email);
@@ -111,13 +112,27 @@ async function run() {
       res.send(result);
     });
 
+
+    
+    app.get("/loggedUser/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
+      console.log(email);
+      const query = { email: email};
+      const result = await earnMoneyUsersCollection.findOne(query);
+      res.send(result);
+    });
+
+
+
+
     // TODO: Must add email query for specific buyer
     app.get("/my-tasks/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
       console.log(email);
+      const query = {"buyerInfo.email": email}
       try {
         const result = await newTaskCollection
-          .find()
+          .find(query)
           // .sort({ compilationDate: -1 })
           .toArray();
 
@@ -156,17 +171,20 @@ async function run() {
     });
 
     app.patch("/submissionStatus/:id",async(req,res) => {
+      const submitStatus = req.body;
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
-      const submitStatus = req.body;
+      console.log(submitStatus);
       const updatedDoc = {
         $set: {
           status: submitStatus.status,
         },
       };
-      const result = await bookServiceCollection.updateOne(filter, updatedDoc);
+      const result = await taskSubmissionCollection.updateOne(filter, updatedDoc);
       res.send(result);
     })
+
+
 
     
     // Worker API Routes

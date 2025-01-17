@@ -18,11 +18,10 @@ app.get("/", (req, res) => {
 
 //custom middleware for verify
 const verifyToken = (req, res, next) => {
-  
   if (!req.headers.authorization) {
     return res.status(401).send({ message: "Unauthorized access" });
   }
-  const token = req.headers.authorization.split(" ")[1]
+  const token = req.headers.authorization.split(" ")[1];
   console.log(token);
   jwt.verify(token, process.env.ACCESS_KEY_SECRET, (err, decoded) => {
     if (err) {
@@ -58,11 +57,13 @@ async function run() {
     app.post("/jwt", async (req, res) => {
       const user = req.body;
       const token = jwt.sign(user, process.env.ACCESS_KEY_SECRET, {
-        expiresIn: "1h",
+        expiresIn: "10d",
       });
       console.log(token);
       res.send({ token });
     });
+
+    // Users Management related API Start
 
     app.post("/earning-users", async (req, res) => {
       const user = req.body;
@@ -76,18 +77,37 @@ async function run() {
       res.send(result);
     });
 
+    app.get("/allUsers/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
+      console.log(email);
+      const query = { email: { $ne: email } };
+      const result = await earnMoneyUsersCollection.find(query).toArray();
+      res.send(result);
+    });
+
+
+
+
     app.get("/users/role/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
       if (email !== req.user.email) {
         return res.status(403).send({ message: "Forbidden access" });
       }
-      console.log(email);
       const query = { email: email };
       const result = await earnMoneyUsersCollection.findOne(query);
-      console.log(result);
       res.send({ role: result?.role });
     });
 
+
+    app.delete("/user/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await earnMoneyUsersCollection.deleteOne(query);
+      res.send(result);
+    });
+
+    // Users Management related API End
+    // Buyer Task Management Related API start
     app.post("/new-tasks", verifyToken, async (req, res) => {
       const newTasks = req.body;
       const result = await newTaskCollection.insertOne(newTasks);
@@ -95,13 +115,11 @@ async function run() {
     });
 
     app.get("/my-tasks/:email", verifyToken, async (req, res) => {
-      
       const email = req.params.email;
       console.log(email);
-
       try {
         const result = await newTaskCollection
-          .find()
+          .find({ email })
           .sort({ compilationDate: -1 })
           .toArray();
 

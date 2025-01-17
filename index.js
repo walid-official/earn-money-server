@@ -85,9 +85,6 @@ async function run() {
       res.send(result);
     });
 
-
-
-
     app.get("/users/role/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
       if (email !== req.user.email) {
@@ -97,7 +94,6 @@ async function run() {
       const result = await earnMoneyUsersCollection.findOne(query);
       res.send({ role: result?.role });
     });
-
 
     app.delete("/user/:id", async (req, res) => {
       const id = req.params.id;
@@ -114,13 +110,14 @@ async function run() {
       res.send(result);
     });
 
+    // TODO: Must add email query for specific buyer
     app.get("/my-tasks/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
       console.log(email);
       try {
         const result = await newTaskCollection
-          .find({ email })
-          .sort({ compilationDate: -1 })
+          .find()
+          // .sort({ compilationDate: -1 })
           .toArray();
 
         res.send(result);
@@ -155,6 +152,20 @@ async function run() {
       };
       const result = await newTaskCollection.updateOne(filter, updateDoc);
       res.send(result);
+    });
+
+    
+    // Worker API Routes
+    app.get("/postedTasks", verifyToken, async (req, res) => {
+      try {
+        const result = await newTaskCollection
+          .find().toArray();
+
+        res.send(result);
+      } catch (error) {
+        console.error("Error fetching tasks:", error);
+        res.status(500).send("Internal Server Error");
+      }
     });
 
     // Send a ping to confirm a successful connection

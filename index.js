@@ -52,6 +52,7 @@ async function run() {
       .db("earn_db")
       .collection("earnMoneyUser");
     const newTaskCollection = client.db("earn_db").collection("newTasks");
+    const taskSubmissionCollection = client.db("earn_db").collection("taskSubmission");
 
     // jwt related api
     app.post("/jwt", async (req, res) => {
@@ -166,6 +167,20 @@ async function run() {
         console.error("Error fetching tasks:", error);
         res.status(500).send("Internal Server Error");
       }
+    });
+
+    app.post("/taskSubmissions",verifyToken,async(req,res) => {
+      const submission = req.body;
+      const result = await taskSubmissionCollection.insertOne(submission);
+      res.send(result);
+    })
+
+    app.get("/mySubmissions/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
+      console.log(email);
+      const query = { "worker_detail.email": email };
+      const result = await taskSubmissionCollection.find(query).toArray();
+      res.send(result);
     });
 
     // Send a ping to confirm a successful connection

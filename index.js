@@ -1,7 +1,9 @@
 require("dotenv").config();
+// import { PaymentIntents } from './node_modules/stripe/esm/resources/PaymentIntents';
 const express = require("express");
 var jwt = require("jsonwebtoken");
 const cors = require("cors");
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const app = express();
 const port = process.env.PORT || 9000;
@@ -52,7 +54,9 @@ async function run() {
       .db("earn_db")
       .collection("earnMoneyUser");
     const newTaskCollection = client.db("earn_db").collection("newTasks");
-    const taskSubmissionCollection = client.db("earn_db").collection("taskSubmission");
+    const taskSubmissionCollection = client
+      .db("earn_db")
+      .collection("taskSubmission");
 
     // jwt related api
     app.post("/jwt", async (req, res) => {
@@ -112,28 +116,25 @@ async function run() {
       res.send(result);
     });
 
-
-    
     app.get("/loggedUser/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
       console.log(email);
-      const query = { email: email};
+      const query = { email: email };
       const result = await earnMoneyUsersCollection.findOne(query);
       res.send(result);
     });
 
-
-
-
-    // TODO: Must add email query for specific buyer
+    // TODO:
     app.get("/my-tasks/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
       console.log(email);
-      const query = {"buyerInfo.email": email}
+      const query = { "buyerInfo.email": email };
       try {
         const result = await newTaskCollection
           .find(query)
-          // .sort({ compilationDate: -1 })
+          .sort({
+            completionDate: -1,
+          })
           .toArray();
 
         res.send(result);
@@ -170,7 +171,7 @@ async function run() {
       res.send(result);
     });
 
-    app.patch("/submissionStatus/:id",async(req,res) => {
+    app.patch("/submissionStatus/:id", async (req, res) => {
       const submitStatus = req.body;
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
@@ -180,18 +181,20 @@ async function run() {
           status: submitStatus.status,
         },
       };
-      const result = await taskSubmissionCollection.updateOne(filter, updatedDoc);
+      const result = await taskSubmissionCollection.updateOne(
+        filter,
+        updatedDoc
+      );
+      // if(submitStatus.status === "Reject"){
+
+      // }
       res.send(result);
-    })
+    });
 
-
-
-    
     // Worker API Routes
     app.get("/postedTasks", verifyToken, async (req, res) => {
       try {
-        const result = await newTaskCollection
-          .find().toArray();
+        const result = await newTaskCollection.find().toArray();
 
         res.send(result);
       } catch (error) {
@@ -200,12 +203,34 @@ async function run() {
       }
     });
 
-    app.post("/taskSubmissions",verifyToken,async(req,res) => {
+    app.post("/taskSubmissions/:email", verifyToken, async (req, res) => {
       const submission = req.body;
-      const result = await taskSubmissionCollection.insertOne(submission);
-      res.send(result);
-    })
+      const email = req.params.email;
+      const query = { "worker_detail.email": email };
+      const alreadyExist = await taskSubmissionCollection.findOne(query);
+      if (alreadyExist) {
+        return res.send({ message: "User is Already Exist" });
+      }
+      try {
+        // Insert the new submission
+        const result = await taskSubmissionCollection.insertOne(submission);
 
+        // Update the worker count for the related task
+        const taskId = submission.task_id; // Assuming the task ID is included in the submission
+        const filter = { _id: new ObjectId(taskId) };
+        const updateDoc = {
+          $inc: { worker: -1 }, // Decrease worker count by 1
+        };
+
+        await newTaskCollection.updateOne(filter, updateDoc);
+
+        res.send(result);
+      } catch (err) {
+        res
+          .status(500)
+          .send({ error: "An error occurred", details: err.message });
+      }
+    });
 
     app.get("/mySubmissions/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
@@ -215,12 +240,17 @@ async function run() {
       res.send(result);
     });
 
-
-    app.get("/review-tasks", verifyToken, async(req,res) => {
+    app.get("/review-tasks", verifyToken, async (req, res) => {
       const result = await taskSubmissionCollection.find().toArray();
       res.send(result);
-    })
+    });
 
+    // payment Intent
+    // app.post("/create-payment-intent",async(req,res) =>{
+    //   const {coin} = req.body;
+    //   const amount = parseInt(coin);
+
+    // })
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });

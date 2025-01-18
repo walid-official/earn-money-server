@@ -6,7 +6,7 @@ const cors = require("cors");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const app = express();
-const port = process.env.PORT || 9000;
+const port = process.env.PORT || 5000;
 
 // earnMoney
 // FgFpDElX87Xan2RT
@@ -183,6 +183,18 @@ async function run() {
       const result = await newTaskCollection.updateOne(filter, updateDoc);
       res.send(result);
     });
+
+  app.patch("/refillData/:email",async(req,res) => {
+    const email = req.params.email;
+    const refillData = req.body;
+    console.log(refillData);
+    const filter = {email: email}
+    const updateDoc = {
+      $inc: { coin: refillData.paymentCoin }, 
+    };
+    const result = await earnMoneyUsersCollection.updateOne(filter,updateDoc);
+    res.send(result);
+  })
 
     app.patch("/submissionStatus/:id", async (req, res) => {
       const { reviewInfo } = req.body;

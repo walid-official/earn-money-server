@@ -112,8 +112,22 @@ async function run() {
     // Buyer Task Management Related API start
     app.post("/new-tasks", verifyToken, async (req, res) => {
       const newTasks = req.body;
-      const result = await newTaskCollection.insertOne(newTasks);
-      res.send(result);
+      console.log(newTasks.payment, newTasks.coinId);
+      const paymentCoin = newTasks.PaymentCoin;
+      console.log(paymentCoin);
+      try {
+        const result = await newTaskCollection.insertOne(newTasks);
+        const coinId = newTasks.coinId; // Assuming the task ID is included in the submission
+        const filter = { _id: new ObjectId(coinId) };
+        const updateDoc = {
+          $inc: { coin: -paymentCoin }, // Decrease worker count by 1
+        };
+
+        await earnMoneyUsersCollection.updateOne(filter, updateDoc);
+        res.send(result);
+      } catch (err) {
+        console.log(err);
+      }
     });
 
     app.get("/loggedUser/:email", verifyToken, async (req, res) => {
@@ -123,8 +137,7 @@ async function run() {
       const result = await earnMoneyUsersCollection.findOne(query);
       res.send(result);
     });
-
-    // TODO:
+ 
     app.get("/my-tasks/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
       console.log(email);
@@ -172,7 +185,7 @@ async function run() {
     });
 
     app.patch("/submissionStatus/:id", async (req, res) => {
-      const {reviewInfo} = req.body;
+      const { reviewInfo } = req.body;
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
       console.log(reviewInfo);
@@ -186,22 +199,25 @@ async function run() {
         updatedDoc
       );
       try {
-        const taskId = reviewInfo.taskId; // Assuming taskId is provided in reviewInfo
+        const taskId = reviewInfo.taskId;
         const taskFilter = { _id: new ObjectId(taskId) };
         let incrementValue = 0;
-    
+
         if (reviewInfo.status === "Reject") {
-          incrementValue = 1;  // Increase worker count by 1 if rejected
+          incrementValue = 1;
         } else if (reviewInfo.status === "Approve") {
-          incrementValue = -1; // Decrease worker count by 1 if approved
+          incrementValue = -1;
         }
-    
+
         if (incrementValue !== 0) {
           const incrementDoc = { $inc: { worker: incrementValue } };
           await newTaskCollection.updateOne(taskFilter, incrementDoc);
         }
       } catch (error) {
-        return res.status(500).send({ error: "Failed to update worker count", details: error.message });
+        return res.status(500).send({
+          error: "Failed to update worker count",
+          details: error.message,
+        });
       }
       res.send(result);
     });
@@ -220,12 +236,12 @@ async function run() {
 
     app.post("/taskSubmissions/:email", verifyToken, async (req, res) => {
       const submission = req.body;
-      const email = req.params.email;
-      const query = { "worker_detail.email": email };
-      const alreadyExist = await taskSubmissionCollection.findOne(query);
-      if (alreadyExist) {
-        return res.send({ message: "User is Already Exist" });
-      }
+      // const email = req.params.email;
+      // const query = { "worker_detail.email": email };
+      // const alreadyExist = await taskSubmissionCollection.findOne(query);
+      // if (alreadyExist) {
+      //   return res.send({ message: "User is Already Exist" });
+      // }
       try {
         // Insert the new submission
         const result = await taskSubmissionCollection.insertOne(submission);
@@ -246,6 +262,17 @@ async function run() {
           .send({ error: "An error occurred", details: err.message });
       }
     });
+
+
+    app.patch("/paymentCoin",async(req,res) => {
+      const {approvedCoin} = req.body;
+      const filter = {email: approvedCoin.workerEmail}
+      const updateDoc = {
+        $inc: { coin: approvedCoin.PaymentCoin }, 
+      };
+      const result = await earnMoneyUsersCollection.updateOne(filter,updateDoc);
+      res.send(result);
+    })
 
     app.get("/mySubmissions/:email", verifyToken, async (req, res) => {
       const email = req.params.email;

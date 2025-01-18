@@ -172,22 +172,37 @@ async function run() {
     });
 
     app.patch("/submissionStatus/:id", async (req, res) => {
-      const submitStatus = req.body;
+      const {reviewInfo} = req.body;
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
-      console.log(submitStatus);
+      console.log(reviewInfo);
       const updatedDoc = {
         $set: {
-          status: submitStatus.status,
+          status: reviewInfo.status,
         },
       };
       const result = await taskSubmissionCollection.updateOne(
         filter,
         updatedDoc
       );
-      // if(submitStatus.status === "Reject"){
-
-      // }
+      try {
+        const taskId = reviewInfo.taskId; // Assuming taskId is provided in reviewInfo
+        const taskFilter = { _id: new ObjectId(taskId) };
+        let incrementValue = 0;
+    
+        if (reviewInfo.status === "Reject") {
+          incrementValue = 1;  // Increase worker count by 1 if rejected
+        } else if (reviewInfo.status === "Approve") {
+          incrementValue = -1; // Decrease worker count by 1 if approved
+        }
+    
+        if (incrementValue !== 0) {
+          const incrementDoc = { $inc: { worker: incrementValue } };
+          await newTaskCollection.updateOne(taskFilter, incrementDoc);
+        }
+      } catch (error) {
+        return res.status(500).send({ error: "Failed to update worker count", details: error.message });
+      }
       res.send(result);
     });
 

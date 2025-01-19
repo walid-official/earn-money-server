@@ -158,6 +158,18 @@ async function run() {
       }
     });
 
+    app.get("/allTasks/:email", verifyToken, async (req, res) => {
+      try {
+        const result = await newTaskCollection
+          .find().toArray();
+
+        res.send(result);
+      } catch (error) {
+        console.error("Error fetching tasks:", error);
+        res.status(500).send("Internal Server Error");
+      }
+    });
+
     app.delete("/tasks/:id", async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
@@ -318,7 +330,6 @@ async function run() {
       }
     });
 
-
     // Admin Routes
     app.get("/withdrawalRequests/:email", verifyToken, async (req, res) => {
       try {
@@ -347,19 +358,21 @@ async function run() {
       res.send(result);
     });
 
-
-    app.patch("/update-role",verifyToken,async(req,res) => {
+    app.patch("/update-role", verifyToken, async (req, res) => {
       const roleStatus = req.body;
       console.log(roleStatus);
       const filter = { email: roleStatus.email };
       const updateDoc = {
         $set: {
-          role: roleStatus.role
-        }
-      }
-      const result = await earnMoneyUsersCollection.updateOne(filter, updateDoc);
+          role: roleStatus.role,
+        },
+      };
+      const result = await earnMoneyUsersCollection.updateOne(
+        filter,
+        updateDoc
+      );
       res.send(result);
-    })
+    });
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });

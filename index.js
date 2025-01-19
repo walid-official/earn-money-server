@@ -24,7 +24,7 @@ const verifyToken = (req, res, next) => {
     return res.status(401).send({ message: "Unauthorized access" });
   }
   const token = req.headers.authorization.split(" ")[1];
-  console.log(token);
+  // console.log(token);
   jwt.verify(token, process.env.ACCESS_KEY_SECRET, (err, decoded) => {
     if (err) {
       return res.status(401).send({ message: "Unauthorized access" });
@@ -57,6 +57,7 @@ async function run() {
     const taskSubmissionCollection = client
       .db("earn_db")
       .collection("taskSubmission");
+    const withdrawalCollection = client.db("earn_db").collection("withdrawal");
 
     // jwt related api
     app.post("/jwt", async (req, res) => {
@@ -137,7 +138,7 @@ async function run() {
       const result = await earnMoneyUsersCollection.findOne(query);
       res.send(result);
     });
- 
+
     app.get("/my-tasks/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
       console.log(email);
@@ -184,17 +185,20 @@ async function run() {
       res.send(result);
     });
 
-  app.patch("/refillData/:email",async(req,res) => {
-    const email = req.params.email;
-    const refillData = req.body;
-    console.log(refillData);
-    const filter = {email: email}
-    const updateDoc = {
-      $inc: { coin: refillData.paymentCoin }, 
-    };
-    const result = await earnMoneyUsersCollection.updateOne(filter,updateDoc);
-    res.send(result);
-  })
+    app.patch("/refillData/:email", async (req, res) => {
+      const email = req.params.email;
+      const refillData = req.body;
+      console.log(refillData);
+      const filter = { email: email };
+      const updateDoc = {
+        $inc: { coin: refillData.paymentCoin },
+      };
+      const result = await earnMoneyUsersCollection.updateOne(
+        filter,
+        updateDoc
+      );
+      res.send(result);
+    });
 
     app.patch("/submissionStatus/:id", async (req, res) => {
       const { reviewInfo } = req.body;
@@ -275,16 +279,18 @@ async function run() {
       }
     });
 
-
-    app.patch("/paymentCoin",async(req,res) => {
-      const {approvedCoin} = req.body;
-      const filter = {email: approvedCoin.workerEmail}
+    app.patch("/paymentCoin", async (req, res) => {
+      const { approvedCoin } = req.body;
+      const filter = { email: approvedCoin.workerEmail };
       const updateDoc = {
-        $inc: { coin: approvedCoin.PaymentCoin }, 
+        $inc: { coin: approvedCoin.PaymentCoin },
       };
-      const result = await earnMoneyUsersCollection.updateOne(filter,updateDoc);
+      const result = await earnMoneyUsersCollection.updateOne(
+        filter,
+        updateDoc
+      );
       res.send(result);
-    })
+    });
 
     app.get("/mySubmissions/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
@@ -299,12 +305,23 @@ async function run() {
       res.send(result);
     });
 
-    // payment Intent
-    // app.post("/create-payment-intent",async(req,res) =>{
-    //   const {coin} = req.body;
-    //   const amount = parseInt(coin);
-
-    // })
+    // withdrawals route
+    app.post("/withdrawals/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
+      const withdrawal = req.body;
+      try {
+        const result = await withdrawalCollection.insertOne(withdrawal);
+        res.send(result);
+        const filter = { email: email };
+        const updateDoc = {
+          $inc: { coin: -withdrawal.withdrawCoin },
+        };
+        await earnMoneyUsersCollection.updateOne(filter, updateDoc);
+        res.send(result);
+      } catch (err) {
+        console.log(err);
+      }
+    });
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });

@@ -58,6 +58,7 @@ async function run() {
       .db("earn_db")
       .collection("taskSubmission");
     const withdrawalCollection = client.db("earn_db").collection("withdrawal");
+    const notificationCollection = client.db("earn_db").collection("notifications");
 
     // jwt related api
     app.post("/jwt", async (req, res) => {
@@ -380,6 +381,20 @@ async function run() {
       const result = await newTaskCollection.deleteOne(query);
       res.send(result);
     });
+
+    // Notification Routes
+    app.post("/notifications", verifyToken, async(req,res) => {
+      const notification = req.body;
+      const result = await notificationCollection.insertOne(notification);
+      res.send(result);
+    })
+
+    app.get("/notification/:email",verifyToken,async(req,res) => {
+      const email = req.params.email;
+      const query = {email: email};
+      const result = await notificationCollection.find(query).sort({ time: -1 }).toArray()
+      res.send(result)
+    })
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });

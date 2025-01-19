@@ -274,11 +274,11 @@ async function run() {
         // Insert the new submission
         const result = await taskSubmissionCollection.insertOne(submission);
 
-        // Update the worker count for the related task
-        const taskId = submission.task_id; // Assuming the task ID is included in the submission
+        
+        const taskId = submission.task_id; 
         const filter = { _id: new ObjectId(taskId) };
         const updateDoc = {
-          $inc: { worker: -1 }, // Decrease worker count by 1
+          $inc: { worker: -1 }, 
         };
 
         await newTaskCollection.updateOne(filter, updateDoc);
@@ -371,6 +371,13 @@ async function run() {
         filter,
         updateDoc
       );
+      res.send(result);
+    });
+
+    app.delete("/manage-remove-task/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await newTaskCollection.deleteOne(query);
       res.send(result);
     });
 

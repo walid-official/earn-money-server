@@ -311,17 +311,55 @@ async function run() {
       const withdrawal = req.body;
       try {
         const result = await withdrawalCollection.insertOne(withdrawal);
-        res.send(result);
-        const filter = { email: email };
-        const updateDoc = {
-          $inc: { coin: -withdrawal.withdrawCoin },
-        };
-        await earnMoneyUsersCollection.updateOne(filter, updateDoc);
+
         res.send(result);
       } catch (err) {
         console.log(err);
       }
     });
+
+
+    // Admin Routes
+    app.get("/withdrawalRequests/:email", verifyToken, async (req, res) => {
+      try {
+        const result = await withdrawalCollection.find().toArray();
+        res.send(result);
+      } catch (err) {
+        console.log(err);
+      }
+    });
+
+    app.patch("/withdrawUpdate/:email", verifyToken, async (req, res) => {
+      const withdrawData = req.body;
+      console.log(withdrawData);
+      const filter = { email: withdrawData.email };
+
+      const updateDoc = {
+        $inc: { coin: -withdrawData.withdrawCoin },
+      };
+      const updateStatus = {
+        $set: {
+          status: withdrawData.approved,
+        },
+      };
+      const result = await withdrawalCollection.updateOne(filter, updateStatus);
+      await earnMoneyUsersCollection.updateOne(filter, updateDoc);
+      res.send(result);
+    });
+
+
+    app.patch("/update-role",verifyToken,async(req,res) => {
+      const roleStatus = req.body;
+      console.log(roleStatus);
+      const filter = { email: roleStatus.email };
+      const updateDoc = {
+        $set: {
+          role: roleStatus.role
+        }
+      }
+      const result = await earnMoneyUsersCollection.updateOne(filter, updateDoc);
+      res.send(result);
+    })
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });

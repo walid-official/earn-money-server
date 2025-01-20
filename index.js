@@ -326,8 +326,19 @@ async function run() {
       res.send({ result, total });
     });
 
-    app.get("/review-tasks", verifyToken, async (req, res) => {
-      const result = await taskSubmissionCollection.find().toArray();
+
+
+    app.get("/review-tasks/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
+      const query = { "buyer_detail.email": email };
+      const result = await taskSubmissionCollection.find(query).toArray();
+      res.send(result);
+    });
+
+    app.get("/pendingSubmissions/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
+      const query = { "worker_detail.email": email, status: "pending" };
+      const result = await taskSubmissionCollection.find(query).toArray();
       res.send(result);
     });
 
@@ -446,10 +457,10 @@ async function run() {
       }
     });
 
-      // paymentHistory Routes
+    // paymentHistory Routes
     app.post("/payment-history/:email", verifyToken, async (req, res) => {
       const history = req.body;
-      const email = req.params.email
+      const email = req.params.email;
       if (!history.email || !history.coin) {
         return res.status(400).send({ message: "Invalid data" });
       }
@@ -469,12 +480,12 @@ async function run() {
       }
     });
 
-    app.get("/payment-history/:email", verifyToken, async(req,res) => {
+    app.get("/payment-history/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
-      const query = {email: email}
-      const result = await paymentHistoryCollection.find(query).toArray()
-      res.send(result)
-    })
+      const query = { email: email };
+      const result = await paymentHistoryCollection.find(query).toArray();
+      res.send(result);
+    });
 
     // 1. id 2. currency 3. coin 4. amount 5. date 6. email 7. method 8. status
 

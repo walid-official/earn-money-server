@@ -487,6 +487,12 @@ async function run() {
       res.send(result);
     });
 
+// Admin route
+    app.get("/allPayments-history",verifyToken,async(req,res) => {
+      const result = await paymentHistoryCollection.find().toArray();
+      res.send(result);
+    })
+
     // 1. id 2. currency 3. coin 4. amount 5. date 6. email 7. method 8. status
 
     // Send a ping to confirm a successful connection

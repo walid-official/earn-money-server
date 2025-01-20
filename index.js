@@ -1,5 +1,4 @@
 require("dotenv").config();
-// import { PaymentIntents } from './node_modules/stripe/esm/resources/PaymentIntents';
 const express = require("express");
 var jwt = require("jsonwebtoken");
 const cors = require("cors");
@@ -58,7 +57,12 @@ async function run() {
       .db("earn_db")
       .collection("taskSubmission");
     const withdrawalCollection = client.db("earn_db").collection("withdrawal");
-    const notificationCollection = client.db("earn_db").collection("notifications");
+    const notificationCollection = client
+      .db("earn_db")
+      .collection("notifications");
+    const paymentDetailsCollection = client
+      .db("earn_db")
+      .collection("paymentDetails");
 
     // jwt related api
     app.post("/jwt", async (req, res) => {
@@ -161,8 +165,7 @@ async function run() {
 
     app.get("/allTasks/:email", verifyToken, async (req, res) => {
       try {
-        const result = await newTaskCollection
-          .find().toArray();
+        const result = await newTaskCollection.find().toArray();
 
         res.send(result);
       } catch (error) {
@@ -275,11 +278,10 @@ async function run() {
         // Insert the new submission
         const result = await taskSubmissionCollection.insertOne(submission);
 
-        
-        const taskId = submission.task_id; 
+        const taskId = submission.task_id;
         const filter = { _id: new ObjectId(taskId) };
         const updateDoc = {
-          $inc: { worker: -1 }, 
+          $inc: { worker: -1 },
         };
 
         await newTaskCollection.updateOne(filter, updateDoc);
@@ -307,10 +309,18 @@ async function run() {
 
     app.get("/mySubmissions/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
+      console.log(req.query);
+      const page = parseInt(req.query.page);
+      const size = parseInt(req.query.size);
       console.log(email);
       const query = { "worker_detail.email": email };
-      const result = await taskSubmissionCollection.find(query).toArray();
-      res.send(result);
+      const total = await taskSubmissionCollection.countDocuments(query);
+      const result = await taskSubmissionCollection
+        .find(query)
+        .limit(size)
+        .skip(page * size)
+        .toArray();
+      res.send({ result, total });
     });
 
     app.get("/review-tasks", verifyToken, async (req, res) => {
@@ -383,18 +393,56 @@ async function run() {
     });
 
     // Notification Routes
-    app.post("/notifications", verifyToken, async(req,res) => {
+    app.post("/notifications", verifyToken, async (req, res) => {
       const notification = req.body;
       const result = await notificationCollection.insertOne(notification);
       res.send(result);
-    })
+    });
 
-    app.get("/notification/:email",verifyToken,async(req,res) => {
+    app.get("/notification/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
-      const query = {email: email};
-      const result = await notificationCollection.find(query).sort({ time: -1 }).toArray()
-      res.send(result)
-    })
+      const query = { email: email };
+      const result = await notificationCollection
+        .find(query)
+        .sort({ time: -1 })
+        .toArray();
+      res.send(result);
+    });
+
+    app.get("/paymentDetails", verifyToken, async (req, res) => {
+      const result = await paymentDetailsCollection.find().toArray();
+      res.send(result);
+    });
+    // paymentDetails
+    app.get("/paymentDetails/:id", verifyToken, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await paymentDetailsCollection.findOne(query);
+      res.send(result);
+    });
+
+    app.post("/create-payment-intent", async (req, res) => {
+      const { price } = req.body;
+    
+      // Validate price
+      if (typeof price !== 'number' || isNaN(price)) {
+        return res.status(400).send({ error: "Invalid price value" });
+      }
+    
+      const amount = Math.round(price * 100); // Use Math.round for better precision
+      
+      try {
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount: amount,
+          currency: 'usd',
+          payment_method_types: ['card']
+        });
+        res.send({ clientSecret: paymentIntent.client_secret });
+      } catch (error) {
+        res.status(500).send({ error: error.message });
+      }
+    });
+    
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });

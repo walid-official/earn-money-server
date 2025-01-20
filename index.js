@@ -63,6 +63,9 @@ async function run() {
     const paymentDetailsCollection = client
       .db("earn_db")
       .collection("paymentDetails");
+    const paymentHistoryCollection = client
+      .db("earn_db")
+      .collection("paymentHistory");
 
     // jwt related api
     app.post("/jwt", async (req, res) => {
@@ -423,26 +426,57 @@ async function run() {
 
     app.post("/create-payment-intent", async (req, res) => {
       const { price } = req.body;
-    
+
       // Validate price
-      if (typeof price !== 'number' || isNaN(price)) {
+      if (typeof price !== "number" || isNaN(price)) {
         return res.status(400).send({ error: "Invalid price value" });
       }
-    
+
       const amount = Math.round(price * 100); // Use Math.round for better precision
-      
+
       try {
         const paymentIntent = await stripe.paymentIntents.create({
           amount: amount,
-          currency: 'usd',
-          payment_method_types: ['card']
+          currency: "usd",
+          payment_method_types: ["card"],
         });
         res.send({ clientSecret: paymentIntent.client_secret });
       } catch (error) {
         res.status(500).send({ error: error.message });
       }
     });
-    
+
+      // paymentHistory Routes
+    app.post("/payment-history/:email", verifyToken, async (req, res) => {
+      const history = req.body;
+      const email = req.params.email
+      if (!history.email || !history.coin) {
+        return res.status(400).send({ message: "Invalid data" });
+      }
+
+      console.log(history);
+      const filter = { email: email };
+      const updateDoc = {
+        $inc: { coin: history.coin },
+      };
+      try {
+        const result = await paymentHistoryCollection.insertOne(history);
+        await earnMoneyUsersCollection.updateOne(filter, updateDoc);
+        res.send(result);
+      } catch (err) {
+        console.error(err);
+        res.status(500).send({ message: "Internal Server Error" });
+      }
+    });
+
+    app.get("/payment-history/:email", verifyToken, async(req,res) => {
+      const email = req.params.email;
+      const query = {email: email}
+      const result = await paymentHistoryCollection.find(query).toArray()
+      res.send(result)
+    })
+
+    // 1. id 2. currency 3. coin 4. amount 5. date 6. email 7. method 8. status
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });

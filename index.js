@@ -85,7 +85,7 @@ const verifyBuyer = async (req,res,next) => {
   const email = req.user?.email;
   const query = {email: email};
   const result = await earnMoneyUsersCollection.findOne(query);
-  if(!result || result?.role !== "Admin") return res.status(403).send({message: "Forbidden Action! Admin only Actions"})
+  if(!result || result?.role !== "Buyer") return res.status(403).send({message: "Forbidden Action! Buyer only Actions"})
   next()
 }
 
@@ -169,7 +169,7 @@ const verifyBuyer = async (req,res,next) => {
       res.send(result);
     });
 
-    app.get("/my-tasks/:email", verifyToken, async (req, res) => {
+    app.get("/my-tasks/:email", verifyToken,verifyBuyer, async (req, res) => {
       const email = req.params.email;
       console.log(email);
       const query = { "buyerInfo.email": email };
@@ -199,34 +199,35 @@ const verifyBuyer = async (req,res,next) => {
       }
     });
 
-    app.delete("/tasks/:id", async (req, res) => {
+    app.delete("/tasks/:id",verifyToken,verifyBuyer, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await newTaskCollection.deleteOne(query);
       res.send(result);
     });
 
-    app.get("/tasks/:id", async (req, res) => {
+    app.get("/tasks/:id",verifyToken, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await newTaskCollection.findOne(query);
       res.send(result);
     });
 
-    app.patch("/taskUpdate/:id", async (req, res) => {
+    app.patch("/taskUpdate/:id",verifyToken,verifyBuyer, async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
       const task = req.body;
       const updateDoc = {
         $set: {
           ...task,
+          ...(task.submissionImage && { submissionImage: task.submissionImage }),
         },
       };
       const result = await newTaskCollection.updateOne(filter, updateDoc);
       res.send(result);
     });
 
-    app.patch("/refillData/:email", async (req, res) => {
+    app.patch("/refillData/:email", verifyToken,verifyBuyer, async (req, res) => {
       const email = req.params.email;
       const refillData = req.body;
       console.log(refillData);
@@ -241,7 +242,7 @@ const verifyBuyer = async (req,res,next) => {
       res.send(result);
     });
 
-    app.patch("/submissionStatus/:id", async (req, res) => {
+    app.patch("/submissionStatus/:id",verifyToken,verifyBuyer, async (req, res) => {
       const { reviewInfo } = req.body;
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
@@ -457,7 +458,7 @@ const verifyBuyer = async (req,res,next) => {
       res.send(result);
     });
 
-    app.post("/create-payment-intent", async (req, res) => {
+    app.post("/create-payment-intent", verifyToken,verifyBuyer, async (req, res) => {
       const { price } = req.body;
 
       // Validate price
@@ -480,7 +481,7 @@ const verifyBuyer = async (req,res,next) => {
     });
 
     // paymentHistory Routes
-    app.post("/payment-history/:email", verifyToken, async (req, res) => {
+    app.post("/payment-history/:email", verifyToken,verifyBuyer, async (req, res) => {
       const history = req.body;
       const email = req.params.email;
       if (!history.email || !history.coin) {
@@ -502,7 +503,7 @@ const verifyBuyer = async (req,res,next) => {
       }
     });
 
-    app.get("/payment-history/:email", verifyToken, async (req, res) => {
+    app.get("/payment-history/:email", verifyToken, verifyBuyer, async (req, res) => {
       const email = req.params.email;
       const query = { email: email };
       const result = await paymentHistoryCollection.find(query).toArray();

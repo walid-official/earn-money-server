@@ -67,6 +67,28 @@ async function run() {
       .db("earn_db")
       .collection("paymentHistory");
 
+
+// Admin Verify middleware
+
+const verifyAdmin = async (req,res,next) => {
+  // console.log("Data from verifyToken middleware---->", req.user);
+
+  const email = req.user?.email;
+  const query = {email: email};
+  const result = await earnMoneyUsersCollection.findOne(query);
+  if(!result || result?.role !== "Admin") return res.status(403).send({message: "Forbidden Action! Admin only Actions"})
+  next()
+}
+
+const verifyBuyer = async (req,res,next) => {
+  console.log("Data from verifyToken middleware---->", req.user);
+  const email = req.user?.email;
+  const query = {email: email};
+  const result = await earnMoneyUsersCollection.findOne(query);
+  if(!result || result?.role !== "Admin") return res.status(403).send({message: "Forbidden Action! Admin only Actions"})
+  next()
+}
+
     // jwt related api
     app.post("/jwt", async (req, res) => {
       const user = req.body;
@@ -92,7 +114,7 @@ async function run() {
     });
 
     // just For Admin
-    app.get("/allUsers/:email", verifyToken, async (req, res) => {
+    app.get("/allUsers/:email", verifyToken, verifyAdmin, async (req, res) => {
       const email = req.params.email;
       console.log(email);
       const query = { email: { $ne: email } };
@@ -119,7 +141,7 @@ async function run() {
 
     // Users Management related API End
     // Buyer Task Management Related API start
-    app.post("/new-tasks", verifyToken, async (req, res) => {
+    app.post("/new-tasks", verifyToken,verifyBuyer, async (req, res) => {
       const newTasks = req.body;
       console.log(newTasks.payment, newTasks.coinId);
       const paymentCoin = newTasks.PaymentCoin;
@@ -166,7 +188,7 @@ async function run() {
       }
     });
 
-    app.get("/allTasks/:email", verifyToken, async (req, res) => {
+    app.get("/allTasks/:email", verifyToken,verifyAdmin, async (req, res) => {
       try {
         const result = await newTaskCollection.find().toArray();
 
@@ -356,7 +378,7 @@ async function run() {
     });
 
     // Admin Routes
-    app.get("/withdrawalRequests/:email", verifyToken, async (req, res) => {
+    app.get("/withdrawalRequests/:email", verifyToken,verifyAdmin, async (req, res) => {
       try {
         const result = await withdrawalCollection.find().toArray();
         res.send(result);
@@ -365,7 +387,7 @@ async function run() {
       }
     });
 
-    app.patch("/withdrawUpdate/:email", verifyToken, async (req, res) => {
+    app.patch("/withdrawUpdate/:email", verifyToken,verifyAdmin, async (req, res) => {
       const withdrawData = req.body;
       console.log(withdrawData);
       const filter = { email: withdrawData.email };
@@ -383,7 +405,7 @@ async function run() {
       res.send(result);
     });
 
-    app.patch("/update-role", verifyToken, async (req, res) => {
+    app.patch("/update-role", verifyToken,verifyAdmin, async (req, res) => {
       const roleStatus = req.body;
       console.log(roleStatus);
       const filter = { email: roleStatus.email };
@@ -399,7 +421,7 @@ async function run() {
       res.send(result);
     });
 
-    app.delete("/manage-remove-task/:id", async (req, res) => {
+    app.delete("/manage-remove-task/:id",verifyToken,verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await newTaskCollection.deleteOne(query);
@@ -488,7 +510,7 @@ async function run() {
     });
 
 // Admin route
-    app.get("/allPayments-history",verifyToken,async(req,res) => {
+    app.get("/allPayments-history",verifyToken,verifyAdmin,async(req,res) => {
       const result = await paymentHistoryCollection.find().toArray();
       res.send(result);
     })

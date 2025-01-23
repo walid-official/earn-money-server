@@ -67,27 +67,44 @@ async function run() {
       .db("earn_db")
       .collection("paymentHistory");
 
+    // Admin Verify middleware
 
-// Admin Verify middleware
+    const verifyAdmin = async (req, res, next) => {
+      // console.log("Data from verifyToken middleware---->", req.user);
 
-const verifyAdmin = async (req,res,next) => {
-  // console.log("Data from verifyToken middleware---->", req.user);
+      const email = req.user?.email;
+      const query = { email: email };
+      const result = await earnMoneyUsersCollection.findOne(query);
+      if (!result || result?.role !== "Admin")
+        return res
+          .status(403)
+          .send({ message: "Forbidden Action! Admin only Actions" });
+      next();
+    };
 
-  const email = req.user?.email;
-  const query = {email: email};
-  const result = await earnMoneyUsersCollection.findOne(query);
-  if(!result || result?.role !== "Admin") return res.status(403).send({message: "Forbidden Action! Admin only Actions"})
-  next()
-}
+    const verifyBuyer = async (req, res, next) => {
+      console.log("Data from verifyToken middleware---->", req.user);
+      const email = req.user?.email;
+      const query = { email: email };
+      const result = await earnMoneyUsersCollection.findOne(query);
+      if (!result || result?.role !== "Buyer")
+        return res
+          .status(403)
+          .send({ message: "Forbidden Action! Buyer only Actions" });
+      next();
+    };
 
-const verifyBuyer = async (req,res,next) => {
-  console.log("Data from verifyToken middleware---->", req.user);
-  const email = req.user?.email;
-  const query = {email: email};
-  const result = await earnMoneyUsersCollection.findOne(query);
-  if(!result || result?.role !== "Buyer") return res.status(403).send({message: "Forbidden Action! Buyer only Actions"})
-  next()
-}
+    const verifyWorker = async (req, res, next) => {
+      console.log("Data from verifyToken middleware---->", req.user);
+      const email = req.user?.email;
+      const query = { email: email };
+      const result = await earnMoneyUsersCollection.findOne(query);
+      if (!result || result?.role !== "Worker")
+        return res
+          .status(403)
+          .send({ message: "Forbidden Action! Worker only Actions" });
+      next();
+    };
 
     // jwt related api
     app.post("/jwt", async (req, res) => {
@@ -113,6 +130,11 @@ const verifyBuyer = async (req,res,next) => {
       res.send(result);
     });
 
+    app.get("/allUsersCoin", async (req, res) => {
+      const result = await earnMoneyUsersCollection.find().toArray();
+      res.send(result);
+    });
+
     // just For Admin
     app.get("/allUsers/:email", verifyToken, verifyAdmin, async (req, res) => {
       const email = req.params.email;
@@ -132,6 +154,15 @@ const verifyBuyer = async (req,res,next) => {
       res.send({ role: result?.role });
     });
 
+    app.get("/users/worker", verifyToken, async (req, res) => {
+      const result = await earnMoneyUsersCollection
+        .find()
+        .sort({ coin: -1 })
+        .limit(6)
+        .toArray();
+      res.send(result);
+    });
+
     app.delete("/user/:id", async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
@@ -141,7 +172,7 @@ const verifyBuyer = async (req,res,next) => {
 
     // Users Management related API End
     // Buyer Task Management Related API start
-    app.post("/new-tasks", verifyToken,verifyBuyer, async (req, res) => {
+    app.post("/new-tasks", verifyToken, verifyBuyer, async (req, res) => {
       const newTasks = req.body;
       console.log(newTasks.payment, newTasks.coinId);
       const paymentCoin = newTasks.PaymentCoin;
@@ -169,7 +200,7 @@ const verifyBuyer = async (req,res,next) => {
       res.send(result);
     });
 
-    app.get("/my-tasks/:email", verifyToken,verifyBuyer, async (req, res) => {
+    app.get("/my-tasks/:email", verifyToken, verifyBuyer, async (req, res) => {
       const email = req.params.email;
       console.log(email);
       const query = { "buyerInfo.email": email };
@@ -188,7 +219,7 @@ const verifyBuyer = async (req,res,next) => {
       }
     });
 
-    app.get("/allTasks/:email", verifyToken,verifyAdmin, async (req, res) => {
+    app.get("/allTasks/:email", verifyToken, verifyAdmin, async (req, res) => {
       try {
         const result = await newTaskCollection.find().toArray();
 
@@ -199,91 +230,105 @@ const verifyBuyer = async (req,res,next) => {
       }
     });
 
-    app.delete("/tasks/:id",verifyToken,verifyBuyer, async (req, res) => {
+    app.delete("/tasks/:id", verifyToken, verifyBuyer, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await newTaskCollection.deleteOne(query);
       res.send(result);
     });
 
-    app.get("/tasks/:id",verifyToken, async (req, res) => {
+    app.get("/tasks/:id", verifyToken, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await newTaskCollection.findOne(query);
       res.send(result);
     });
 
-    app.patch("/taskUpdate/:id",verifyToken,verifyBuyer, async (req, res) => {
+    app.patch("/taskUpdate/:id", verifyToken, verifyBuyer, async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
       const task = req.body;
       const updateDoc = {
         $set: {
           ...task,
-          ...(task.submissionImage && { submissionImage: task.submissionImage }),
+          ...(task.submissionImage && {
+            submissionImage: task.submissionImage,
+          }),
         },
       };
       const result = await newTaskCollection.updateOne(filter, updateDoc);
       res.send(result);
     });
 
-    app.patch("/refillData/:email", verifyToken,verifyBuyer, async (req, res) => {
-      const email = req.params.email;
-      const refillData = req.body;
-      console.log(refillData);
-      const filter = { email: email };
-      const updateDoc = {
-        $inc: { coin: refillData.paymentCoin },
-      };
-      const result = await earnMoneyUsersCollection.updateOne(
-        filter,
-        updateDoc
-      );
-      res.send(result);
-    });
-
-    app.patch("/submissionStatus/:id",verifyToken,verifyBuyer, async (req, res) => {
-      const { reviewInfo } = req.body;
-      const id = req.params.id;
-      const filter = { _id: new ObjectId(id) };
-      console.log(reviewInfo);
-      const updatedDoc = {
-        $set: {
-          status: reviewInfo.status,
-        },
-      };
-      const result = await taskSubmissionCollection.updateOne(
-        filter,
-        updatedDoc
-      );
-      try {
-        const taskId = reviewInfo.taskId;
-        const taskFilter = { _id: new ObjectId(taskId) };
-        let incrementValue = 0;
-
-        if (reviewInfo.status === "Reject") {
-          incrementValue = 1;
-        } else if (reviewInfo.status === "Approve") {
-          incrementValue = -1;
-        }
-
-        if (incrementValue !== 0) {
-          const incrementDoc = { $inc: { worker: incrementValue } };
-          await newTaskCollection.updateOne(taskFilter, incrementDoc);
-        }
-      } catch (error) {
-        return res.status(500).send({
-          error: "Failed to update worker count",
-          details: error.message,
-        });
+    app.patch(
+      "/refillData/:email",
+      verifyToken,
+      verifyBuyer,
+      async (req, res) => {
+        const email = req.params.email;
+        const refillData = req.body;
+        console.log(refillData);
+        const filter = { email: email };
+        const updateDoc = {
+          $inc: { coin: refillData.paymentCoin },
+        };
+        const result = await earnMoneyUsersCollection.updateOne(
+          filter,
+          updateDoc
+        );
+        res.send(result);
       }
-      res.send(result);
-    });
+    );
+
+    app.patch(
+      "/submissionStatus/:id",
+      verifyToken,
+      verifyBuyer,
+      async (req, res) => {
+        const { reviewInfo } = req.body;
+        const id = req.params.id;
+        const filter = { _id: new ObjectId(id) };
+        console.log(reviewInfo);
+        const updatedDoc = {
+          $set: {
+            status: reviewInfo.status,
+          },
+        };
+        const result = await taskSubmissionCollection.updateOne(
+          filter,
+          updatedDoc
+        );
+        try {
+          const taskId = reviewInfo.taskId;
+          const taskFilter = { _id: new ObjectId(taskId) };
+          let incrementValue = 0;
+
+          if (reviewInfo.status === "Reject") {
+            incrementValue = 1;
+          } else if (reviewInfo.status === "Approve") {
+            incrementValue = -1;
+          }
+
+          if (incrementValue !== 0) {
+            const incrementDoc = { $inc: { worker: incrementValue } };
+            await newTaskCollection.updateOne(taskFilter, incrementDoc);
+          }
+        } catch (error) {
+          return res.status(500).send({
+            error: "Failed to update worker count",
+            details: error.message,
+          });
+        }
+        res.send(result);
+      }
+    );
 
     // Worker API Routes
-    app.get("/postedTasks", verifyToken, async (req, res) => {
+    app.get("/postedTasks", verifyToken, verifyWorker, async (req, res) => {
       try {
-        const result = await newTaskCollection.find().toArray();
+        const result = await newTaskCollection
+          .find({ worker: { $gt: 0 } })
+          .toArray();
 
         res.send(result);
       } catch (error) {
@@ -292,33 +337,38 @@ const verifyBuyer = async (req,res,next) => {
       }
     });
 
-    app.post("/taskSubmissions/:email", verifyToken, async (req, res) => {
-      const submission = req.body;
-      // const email = req.params.email;
-      // const query = { "worker_detail.email": email };
-      // const alreadyExist = await taskSubmissionCollection.findOne(query);
-      // if (alreadyExist) {
-      //   return res.send({ message: "User is Already Exist" });
-      // }
-      try {
-        // Insert the new submission
-        const result = await taskSubmissionCollection.insertOne(submission);
+    app.post(
+      "/taskSubmissions/:email",
+      verifyToken,
+      verifyWorker,
+      async (req, res) => {
+        const submission = req.body;
+        // const email = req.params.email;
+        // const query = { "worker_detail.email": email };
+        // const alreadyExist = await taskSubmissionCollection.findOne(query);
+        // if (alreadyExist) {
+        //   return res.send({ message: "User is Already Exist" });
+        // }
+        try {
+          // Insert the new submission
+          const result = await taskSubmissionCollection.insertOne(submission);
 
-        const taskId = submission.task_id;
-        const filter = { _id: new ObjectId(taskId) };
-        const updateDoc = {
-          $inc: { worker: -1 },
-        };
+          const taskId = submission.task_id;
+          const filter = { _id: new ObjectId(taskId) };
+          const updateDoc = {
+            $inc: { worker: -1 },
+          };
 
-        await newTaskCollection.updateOne(filter, updateDoc);
+          await newTaskCollection.updateOne(filter, updateDoc);
 
-        res.send(result);
-      } catch (err) {
-        res
-          .status(500)
-          .send({ error: "An error occurred", details: err.message });
+          res.send(result);
+        } catch (err) {
+          res
+            .status(500)
+            .send({ error: "An error occurred", details: err.message });
+        }
       }
-    });
+    );
 
     app.patch("/paymentCoin", async (req, res) => {
       const { approvedCoin } = req.body;
@@ -333,23 +383,26 @@ const verifyBuyer = async (req,res,next) => {
       res.send(result);
     });
 
-    app.get("/mySubmissions/:email", verifyToken, async (req, res) => {
-      const email = req.params.email;
-      console.log(req.query);
-      const page = parseInt(req.query.page);
-      const size = parseInt(req.query.size);
-      console.log(email);
-      const query = { "worker_detail.email": email };
-      const total = await taskSubmissionCollection.countDocuments(query);
-      const result = await taskSubmissionCollection
-        .find(query)
-        .limit(size)
-        .skip(page * size)
-        .toArray();
-      res.send({ result, total });
-    });
-
-
+    app.get(
+      "/mySubmissions/:email",
+      verifyToken,
+      verifyWorker,
+      async (req, res) => {
+        const email = req.params.email;
+        console.log(req.query);
+        const page = parseInt(req.query.page);
+        const size = parseInt(req.query.size);
+        console.log(email);
+        const query = { "worker_detail.email": email };
+        const total = await taskSubmissionCollection.countDocuments(query);
+        const result = await taskSubmissionCollection
+          .find(query)
+          .limit(size)
+          .skip(page * size)
+          .toArray();
+        res.send({ result, total });
+      }
+    );
 
     app.get("/review-tasks/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
@@ -366,47 +419,85 @@ const verifyBuyer = async (req,res,next) => {
     });
 
     // withdrawals route
-    app.post("/withdrawals/:email", verifyToken, async (req, res) => {
-      const email = req.params.email;
-      const withdrawal = req.body;
-      try {
-        const result = await withdrawalCollection.insertOne(withdrawal);
+    app.post(
+      "/withdrawals/:email",
+      verifyToken,
+      verifyWorker,
+      async (req, res) => {
+        const email = req.params.email;
+        const withdrawal = req.body;
+        try {
+          const result = await withdrawalCollection.insertOne(withdrawal);
 
-        res.send(result);
-      } catch (err) {
-        console.log(err);
+          res.send(result);
+        } catch (err) {
+          console.log(err);
+        }
       }
-    });
+    );
 
     // Admin Routes
-    app.get("/withdrawalRequests/:email", verifyToken,verifyAdmin, async (req, res) => {
-      try {
-        const result = await withdrawalCollection.find().toArray();
-        res.send(result);
-      } catch (err) {
-        console.log(err);
+    app.get(
+      "/withdrawalRequests/:email",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        try {
+          const result = await withdrawalCollection.find().toArray();
+          res.send(result);
+        } catch (err) {
+          console.log(err);
+        }
       }
-    });
+    );
 
-    app.patch("/withdrawUpdate/:email", verifyToken,verifyAdmin, async (req, res) => {
-      const withdrawData = req.body;
-      console.log(withdrawData);
-      const filter = { email: withdrawData.email };
 
-      const updateDoc = {
-        $inc: { coin: -withdrawData.withdrawCoin },
-      };
-      const updateStatus = {
-        $set: {
-          status: withdrawData.approved,
-        },
-      };
-      const result = await withdrawalCollection.updateOne(filter, updateStatus);
-      await earnMoneyUsersCollection.updateOne(filter, updateDoc);
-      res.send(result);
-    });
+    app.patch(
+      "/withdrawalStatusUpdate/:email/:id",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const { email, id } = req.params;
+        const withdrawData = req.body;
 
-    app.patch("/update-role", verifyToken,verifyAdmin, async (req, res) => {
+        const filter = { email: email, _id: new ObjectId(id) };
+        console.log(filter);
+        const updateStatus = {
+          $set: {
+            status: withdrawData.approved,
+          },
+        };
+        const result = await withdrawalCollection.updateOne(
+          filter,
+          updateStatus
+        );
+        res.send(result);
+      }
+    );
+
+
+    app.patch(
+      "/withdrawUpdate/:email",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const withdrawData = req.body;
+        console.log(withdrawData);
+        const filter = { email: req.params.email };
+
+        const updateDoc = {
+          $inc: { coin: -withdrawData.withdrawCoin },
+        };
+        const result = await earnMoneyUsersCollection.updateOne(
+          filter,
+          updateDoc
+        );
+        res.send(result);
+      }
+    );
+
+
+    app.patch("/update-role", verifyToken, verifyAdmin, async (req, res) => {
       const roleStatus = req.body;
       console.log(roleStatus);
       const filter = { email: roleStatus.email };
@@ -422,12 +513,17 @@ const verifyBuyer = async (req,res,next) => {
       res.send(result);
     });
 
-    app.delete("/manage-remove-task/:id",verifyToken,verifyAdmin, async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const result = await newTaskCollection.deleteOne(query);
-      res.send(result);
-    });
+    app.delete(
+      "/manage-remove-task/:id",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const result = await newTaskCollection.deleteOne(query);
+        res.send(result);
+      }
+    );
 
     // Notification Routes
     app.post("/notifications", verifyToken, async (req, res) => {
@@ -458,63 +554,83 @@ const verifyBuyer = async (req,res,next) => {
       res.send(result);
     });
 
-    app.post("/create-payment-intent", verifyToken,verifyBuyer, async (req, res) => {
-      const { price } = req.body;
+    app.post(
+      "/create-payment-intent",
+      verifyToken,
+      verifyBuyer,
+      async (req, res) => {
+        const { price } = req.body;
 
-      // Validate price
-      if (typeof price !== "number" || isNaN(price)) {
-        return res.status(400).send({ error: "Invalid price value" });
+        // Validate price
+        if (typeof price !== "number" || isNaN(price)) {
+          return res.status(400).send({ error: "Invalid price value" });
+        }
+
+        const amount = Math.round(price * 100); // Use Math.round for better precision
+
+        try {
+          const paymentIntent = await stripe.paymentIntents.create({
+            amount: amount,
+            currency: "usd",
+            payment_method_types: ["card"],
+          });
+          res.send({ clientSecret: paymentIntent.client_secret });
+        } catch (error) {
+          res.status(500).send({ error: error.message });
+        }
       }
-
-      const amount = Math.round(price * 100); // Use Math.round for better precision
-
-      try {
-        const paymentIntent = await stripe.paymentIntents.create({
-          amount: amount,
-          currency: "usd",
-          payment_method_types: ["card"],
-        });
-        res.send({ clientSecret: paymentIntent.client_secret });
-      } catch (error) {
-        res.status(500).send({ error: error.message });
-      }
-    });
+    );
 
     // paymentHistory Routes
-    app.post("/payment-history/:email", verifyToken,verifyBuyer, async (req, res) => {
-      const history = req.body;
-      const email = req.params.email;
-      if (!history.email || !history.coin) {
-        return res.status(400).send({ message: "Invalid data" });
-      }
+    app.post(
+      "/payment-history/:email",
+      verifyToken,
+      verifyBuyer,
+      async (req, res) => {
+        const history = req.body;
+        const email = req.params.email;
+        if (!history.email || !history.coin) {
+          return res.status(400).send({ message: "Invalid data" });
+        }
 
-      console.log(history);
-      const filter = { email: email };
-      const updateDoc = {
-        $inc: { coin: history.coin },
-      };
-      try {
-        const result = await paymentHistoryCollection.insertOne(history);
-        await earnMoneyUsersCollection.updateOne(filter, updateDoc);
+        console.log(history);
+        const filter = { email: email };
+        const updateDoc = {
+          $inc: { coin: history.coin },
+        };
+        try {
+          const result = await paymentHistoryCollection.insertOne(history);
+          await earnMoneyUsersCollection.updateOne(filter, updateDoc);
+          res.send(result);
+        } catch (err) {
+          console.error(err);
+          res.status(500).send({ message: "Internal Server Error" });
+        }
+      }
+    );
+
+    app.get(
+      "/payment-history/:email",
+      verifyToken,
+      verifyBuyer,
+      async (req, res) => {
+        const email = req.params.email;
+        const query = { email: email };
+        const result = await paymentHistoryCollection.find(query).toArray();
         res.send(result);
-      } catch (err) {
-        console.error(err);
-        res.status(500).send({ message: "Internal Server Error" });
       }
-    });
+    );
 
-    app.get("/payment-history/:email", verifyToken, verifyBuyer, async (req, res) => {
-      const email = req.params.email;
-      const query = { email: email };
-      const result = await paymentHistoryCollection.find(query).toArray();
-      res.send(result);
-    });
-
-// Admin route
-    app.get("/allPayments-history",verifyToken,verifyAdmin,async(req,res) => {
-      const result = await paymentHistoryCollection.find().toArray();
-      res.send(result);
-    })
+    // Admin route
+    app.get(
+      "/allPayments-history",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const result = await paymentHistoryCollection.find().toArray();
+        res.send(result);
+      }
+    );
 
     // 1. id 2. currency 3. coin 4. amount 5. date 6. email 7. method 8. status
 

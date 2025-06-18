@@ -7,10 +7,20 @@ const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const app = express();
 const port = process.env.PORT || 5000;
 
-// earnMoney
-// FgFpDElX87Xan2RT
+app.use(
+  cors({
+    origin: [
+      "http://localhost:5173",
+      "https://micro-tasking-earn-money-platform.vercel.app/",
+      "https://earn-money-742d2.web.app",
+      "https://earnify-life210.surge.sh",
+    ],
+    credentials: true,
+  })
+);
 
-app.use(cors());
+// app.use(cors())
+
 app.use(express.json());
 
 app.get("/", (req, res) => {
@@ -47,7 +57,7 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    // await client.connect();
 
     const earnMoneyUsersCollection = client
       .db("earn_db")
@@ -130,8 +140,10 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/allUsersCoin", async (req, res) => {
-      const result = await earnMoneyUsersCollection.find().toArray();
+    app.get("/userCoin/:email", async (req, res) => {
+      const query = { email: req.params.email };
+      console.log(query);
+      const result = await earnMoneyUsersCollection.findOne(query);
       res.send(result);
     });
 
@@ -154,7 +166,7 @@ async function run() {
       res.send({ role: result?.role });
     });
 
-    app.get("/users/worker", verifyToken, async (req, res) => {
+    app.get("/users/worker", async (req, res) => {
       const result = await earnMoneyUsersCollection
         .find()
         .sort({ coin: -1 })
@@ -326,14 +338,30 @@ async function run() {
     // Worker API Routes
     app.get("/postedTasks", verifyToken, verifyWorker, async (req, res) => {
       try {
+        const sortOrder = req.query.sort === "Low to heigh" ? 1 : -1; // Determine sorting order
         const result = await newTaskCollection
           .find({ worker: { $gt: 0 } })
+          .sort({ worker: sortOrder }) // Sorting based on worker count
           .toArray();
 
         res.send(result);
       } catch (error) {
         console.error("Error fetching tasks:", error);
         res.status(500).send("Internal Server Error");
+      }
+    });
+
+    app.get("/homePostedTasks", async (req, res) => {
+      try {
+        const result = await newTaskCollection
+          .find({ worker: { $gt: 0 } })
+          .sort({ PaymentCoin: -1 })
+          .limit(8)
+          .toArray();
+
+        res.send(result);
+      } catch (error) {
+        console.error("Error fetching tasks:", error);
       }
     });
 
@@ -451,7 +479,6 @@ async function run() {
       }
     );
 
-
     app.patch(
       "/withdrawalStatusUpdate/:email/:id",
       verifyToken,
@@ -475,7 +502,6 @@ async function run() {
       }
     );
 
-
     app.patch(
       "/withdrawUpdate/:email",
       verifyToken,
@@ -495,7 +521,6 @@ async function run() {
         res.send(result);
       }
     );
-
 
     app.patch("/update-role", verifyToken, verifyAdmin, async (req, res) => {
       const roleStatus = req.body;
@@ -542,17 +567,22 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/paymentDetails", verifyToken, async (req, res) => {
+    app.get("/paymentDetails", verifyToken, verifyBuyer, async (req, res) => {
       const result = await paymentDetailsCollection.find().toArray();
       res.send(result);
     });
     // paymentDetails
-    app.get("/paymentDetails/:id", verifyToken, async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const result = await paymentDetailsCollection.findOne(query);
-      res.send(result);
-    });
+    app.get(
+      "/paymentDetails/:id",
+      verifyToken,
+      verifyBuyer,
+      async (req, res) => {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const result = await paymentDetailsCollection.findOne(query);
+        res.send(result);
+      }
+    );
 
     app.post(
       "/create-payment-intent",
@@ -560,7 +590,8 @@ async function run() {
       verifyBuyer,
       async (req, res) => {
         const { price } = req.body;
-
+        console.log(req.body);
+        console.log(price);
         // Validate price
         if (typeof price !== "number" || isNaN(price)) {
           return res.status(400).send({ error: "Invalid price value" });
@@ -635,10 +666,10 @@ async function run() {
     // 1. id 2. currency 3. coin 4. amount 5. date 6. email 7. method 8. status
 
     // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
-    console.log(
-      "Pinged your deployment. You successfully connected to MongoDB!"
-    );
+    // await client.db("admin").command({ ping: 1 });
+    // console.log(
+    //   "Pinged your deployment. You successfully connected to MongoDB!"
+    // );
   } finally {
     // Ensures that the client will close when you finish/error
     // await client.close();

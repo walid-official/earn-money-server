@@ -19,6 +19,7 @@ app.use(
     origin: [
       "http://localhost:5173",
       "https://micro-tasking-earn-money-platform.vercel.app/",
+      "https://earn-money-nine.vercel.app/",
       "https://earn-money-742d2.web.app",
       "https://earnify-life210.surge.sh",
     ],
